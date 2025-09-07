@@ -48,6 +48,30 @@ pub fn main() !void {
             try stdout.writeAll(clipboard_lib.read() catch "");
             try stdout.flush();
             return;
+        } else if (std.mem.eql(u8, arg, "-l")) {
+            const stdin = &stdin_reader.interface;
+            const input = try stdin.allocRemaining(arena, .unlimited);
+
+            // Initialize the Lua vm
+            var lua = try Lua.init(arena);
+            defer lua.deinit();
+
+            // https://luascripts.com/lua-embed
+            // https://piembsystech.com/integrating-lua-as-a-scripting-language-in-c-c-applications/
+            lua.openLibs();
+
+            try lua.doFile("lua/trim.lua");
+            _ = try lua.getGlobal("trim");
+            try lua.pushAny(input);
+            try lua.protectedCall(.{ .args = 1, .results = 1 });
+
+            const result = try lua.toString(1);
+
+            try clipboard_lib.write(result);
+
+            try stdout.writeAll(result);
+            try stdout.flush();
+            return;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
@@ -72,20 +96,8 @@ pub fn main() !void {
 
         try stdout.writeAll(input);
         try stdout.flush();
-
-        // Initialize the Lua vm
-        var lua = try Lua.init(arena);
-        defer lua.deinit();
-
-        // https://luascripts.com/lua-embed
-        // https://piembsystech.com/integrating-lua-as-a-scripting-language-in-c-c-applications/
-        lua.openLibs();
-        // Add an integer to the Lua stack and retrieve it
-        try lua.pushAny(input);
-        lua.setGlobal("clipboard");
-
-        try lua.doString("print('Value from C:', clipboard)");
     }
+
 }
 
 fn usage(exe: []const u8) !void {
