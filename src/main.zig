@@ -77,9 +77,14 @@ pub fn main() !void {
         var lua = try Lua.init(arena);
         defer lua.deinit();
 
+        // https://luascripts.com/lua-embed
+        // https://piembsystech.com/integrating-lua-as-a-scripting-language-in-c-c-applications/
+        lua.openLibs();
         // Add an integer to the Lua stack and retrieve it
-        lua.pushInteger(42);
-        std.debug.print("{}\n", .{try lua.toInteger(1)});
+        try lua.pushAny(input);
+        lua.setGlobal("clipboard");
+
+        try lua.doString("print('Value from C:', clipboard)");
     }
 }
 
