@@ -1,4 +1,9 @@
 const std = @import("std");
+
+// third-party
+const clipboard_lib = @import("clipboard");
+
+// local
 const nclip_lib = @import("neoclipboard");
 
 // copied from zig's src/main.zig:69
@@ -10,6 +15,7 @@ pub fn main() !void {
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
     try nclip_lib.bufferedPrint();
 
+    // TODO: Replace with GPA because we do not want to keep holding memory after clipboard redices
     var arena_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
@@ -20,6 +26,7 @@ pub fn main() !void {
     var catted_anything = false;
     var stdout_writer = std.fs.File.stdout().writerStreaming(&stdout_buffer);
     const stdout = &stdout_writer.interface;
+    // NOTE: I am not sure why in zig they are using buffered stdin, empty buffer works fine as well
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
 
     const cwd = std.fs.cwd();
@@ -27,7 +34,14 @@ pub fn main() !void {
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "-")) {
             catted_anything = true;
-            _ = try stdout.sendFileAll(&stdin_reader, .unlimited);
+            const stdin = &stdin_reader.interface;
+            const input = try stdin.allocRemaining(arena, .unlimited);
+
+            try clipboard_lib.write(input);
+            // std.debug.print("{s}\n", .{clipboard_lib.read() catch ""});
+
+            // write to stdout
+            try stdout.writeAll(input);
             try stdout.flush();
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
@@ -37,12 +51,22 @@ pub fn main() !void {
 
             catted_anything = true;
             var file_reader = file.reader(&.{});
-            _ = try stdout.sendFileAll(&file_reader, .unlimited);
+            const input = try file_reader.interface.allocRemaining(arena, .unlimited);
+
+            try clipboard_lib.write(input);
+
+            try stdout.writeAll(input);
             try stdout.flush();
         }
     }
     if (!catted_anything) {
-        _ = try stdout.sendFileAll(&stdin_reader, .unlimited);
+        const stdin = &stdin_reader.interface;
+        const input = try stdin.allocRemaining(arena, .unlimited);
+
+        try clipboard_lib.write(input);
+        // std.debug.print("{s}\n", .{clipboard_lib.read() catch ""});
+
+        try stdout.writeAll(input);
         try stdout.flush();
     }
 }
