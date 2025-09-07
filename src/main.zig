@@ -1,6 +1,10 @@
 const std = @import("std");
 const nclip_lib = @import("neoclipboard");
 
+// copied from zig's src/main.zig:69
+// This can be global since stdout is a singleton.
+var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
+
 pub fn main() !void {
     // Prints to stderr, ignoring potential errors.
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
@@ -14,7 +18,7 @@ pub fn main() !void {
 
     const exe = args[0];
     var catted_anything = false;
-    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&stdout_buffer);
     const stdout = &stdout_writer.interface;
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
 
@@ -24,6 +28,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "-")) {
             catted_anything = true;
             _ = try stdout.sendFileAll(&stdin_reader, .unlimited);
+            try stdout.flush();
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
@@ -33,10 +38,12 @@ pub fn main() !void {
             catted_anything = true;
             var file_reader = file.reader(&.{});
             _ = try stdout.sendFileAll(&file_reader, .unlimited);
+            try stdout.flush();
         }
     }
     if (!catted_anything) {
         _ = try stdout.sendFileAll(&stdin_reader, .unlimited);
+        try stdout.flush();
     }
 }
 
