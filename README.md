@@ -22,3 +22,17 @@ Hackable clipboard manager
 ## Future
 
 - Clipboard as service
+
+## Running project
+
+Zig version `0.15.1`
+
+```console
+$ zig build run
+```
+Or
+
+```console
+$ zig build
+./zig-out/bin/neoclipboard
+```
