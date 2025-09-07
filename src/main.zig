@@ -1,14 +1,11 @@
 const std = @import("std");
 const nclip_lib = @import("neoclipboard");
-const fs = std.fs;
-const mem = std.mem;
-const warn = std.log.warn;
-const fatal = std.process.fatal;
 
 pub fn main() !void {
     // Prints to stderr, ignoring potential errors.
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
     try nclip_lib.bufferedPrint();
+
     var arena_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
@@ -21,16 +18,16 @@ pub fn main() !void {
     const stdout = &stdout_writer.interface;
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
 
-    const cwd = fs.cwd();
+    const cwd = std.fs.cwd();
 
     for (args[1..]) |arg| {
-        if (mem.eql(u8, arg, "-")) {
+        if (std.mem.eql(u8, arg, "-")) {
             catted_anything = true;
             _ = try stdout.sendFileAll(&stdin_reader, .unlimited);
-        } else if (mem.startsWith(u8, arg, "-")) {
+        } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
-            const file = cwd.openFile(arg, .{}) catch |err| fatal("unable to open file: {t}\n", .{err});
+            const file = cwd.openFile(arg, .{}) catch |err| std.process.fatal("unable to open file: {t}\n", .{err});
             defer file.close();
 
             catted_anything = true;
@@ -44,7 +41,7 @@ pub fn main() !void {
 }
 
 fn usage(exe: []const u8) !void {
-    warn("Usage: {s} [FILE]...\n", .{exe});
+    std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
 }
 
