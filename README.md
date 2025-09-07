@@ -1,0 +1,2 @@
+# neoclipboard
+Hackable clipboard manager
