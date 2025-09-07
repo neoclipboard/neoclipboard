@@ -87,6 +87,14 @@ pub fn build(b: *std.Build) void {
     // TODO: switch to objc binding https://nathancraddock.com/blog/writing-to-the-clipboard-the-hard-way/#a-bonus-zig-implementation
     // TODO: write Io.Reader and Io.Writer for clipboard
     exe.root_module.addImport("clipboard", b.dependency("clipboard", .{}).module("clipboard"));
+
+    // https://github.com/natecraddock/ziglua
+    const lua_dep = b.dependency("zlua", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("zlua", lua_dep.module("zlua"));
+
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
