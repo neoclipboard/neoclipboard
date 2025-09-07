@@ -11,9 +11,8 @@ const nclip_lib = @import("neoclipboard");
 var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try nclip_lib.bufferedPrint();
+    // // Prints to stderr, ignoring potential errors.
+    // try nclip_lib.bufferedPrint();
 
     // TODO: Replace with GPA because we do not want to keep holding memory after clipboard redices
     var arena_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -38,11 +37,14 @@ pub fn main() !void {
             const input = try stdin.allocRemaining(arena, .unlimited);
 
             try clipboard_lib.write(input);
-            // std.debug.print("{s}\n", .{clipboard_lib.read() catch ""});
 
-            // write to stdout
             try stdout.writeAll(input);
             try stdout.flush();
+        } else if (std.mem.eql(u8, arg, "-o")) {
+            // copy xclip's option name for now
+            try stdout.writeAll(clipboard_lib.read() catch "");
+            try stdout.flush();
+            return;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
@@ -64,7 +66,6 @@ pub fn main() !void {
         const input = try stdin.allocRemaining(arena, .unlimited);
 
         try clipboard_lib.write(input);
-        // std.debug.print("{s}\n", .{clipboard_lib.read() catch ""});
 
         try stdout.writeAll(input);
         try stdout.flush();
