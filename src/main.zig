@@ -60,8 +60,8 @@ pub fn main() !void {
             // https://piembsystech.com/integrating-lua-as-a-scripting-language-in-c-c-applications/
             lua.openLibs();
 
-            try lua.doFile("lua/trim.lua");
-            _ = try lua.getGlobal("trim");
+            try lua.doFile("lua/init.lua");
+            _ = try lua.getGlobal("trim_upper");
             try lua.pushAny(input);
             try lua.protectedCall(.{ .args = 1, .results = 1 });
 
