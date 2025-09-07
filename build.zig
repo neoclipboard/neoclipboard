@@ -83,6 +83,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // https://github.com/dgv/clipboard
+    // TODO: switch to objc binding https://nathancraddock.com/blog/writing-to-the-clipboard-the-hard-way/#a-bonus-zig-implementation
+    exe.root_module.addImport("clipboard", b.dependency("clipboard", .{}).module("clipboard"));
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
