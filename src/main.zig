@@ -2,9 +2,12 @@ const std = @import("std");
 
 // third-party
 const clipboard_lib = @import("clipboard");
+const zlua = @import("zlua");
 
 // local
 const nclip_lib = @import("neoclipboard");
+
+const Lua = zlua.Lua;
 
 // copied from zig's src/main.zig:69
 // This can be global since stdout is a singleton.
@@ -69,6 +72,14 @@ pub fn main() !void {
 
         try stdout.writeAll(input);
         try stdout.flush();
+
+        // Initialize the Lua vm
+        var lua = try Lua.init(arena);
+        defer lua.deinit();
+
+        // Add an integer to the Lua stack and retrieve it
+        lua.pushInteger(42);
+        std.debug.print("{}\n", .{try lua.toInteger(1)});
     }
 }
 
