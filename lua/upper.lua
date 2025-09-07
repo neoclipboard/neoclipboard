@@ -1,7 +1,5 @@
-local M = {}
-
-function M.transform(input)
-    return string.upper(input)
+function transform(input)
+   return string.upper(input)
 end
 
-return M
+return transform

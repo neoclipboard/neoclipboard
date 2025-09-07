@@ -1,6 +1,6 @@
 package.path = package.path .. ";./lua/?.lua"
 
-upper = require("upper").transform
+upper = require("upper")
 
 function trim(input)
    return input:gsub("%s+", "")
