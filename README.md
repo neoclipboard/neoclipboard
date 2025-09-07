@@ -34,5 +34,5 @@ Or
 
 ```console
 $ zig build
-./zig-out/bin/neoclipboard
+$ ./zig-out/bin/nclip
 ```
