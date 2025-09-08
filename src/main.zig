@@ -20,9 +20,9 @@ pub fn main() !void {
     // TODO: Replace with GPA because we do not want to keep holding memory after clipboard redices
     var arena_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_instance.deinit();
-    const arena = arena_instance.allocator();
+    const gpa = arena_instance.allocator();
 
-    const args = try std.process.argsAlloc(arena);
+    const args = try std.process.argsAlloc(gpa);
 
     const exe = args[0];
     var catted_anything = false;
@@ -37,7 +37,8 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "-")) {
             catted_anything = true;
             const stdin = &stdin_reader.interface;
-            const input = try stdin.allocRemaining(arena, .unlimited);
+            const input = try stdin.allocRemaining(gpa, .unlimited);
+            defer gpa.free(input);
 
             try clipboard_lib.write(input);
 
@@ -50,14 +51,16 @@ pub fn main() !void {
             return;
         } else if (std.mem.eql(u8, arg, "-l")) {
             const stdin = &stdin_reader.interface;
-            const input = try stdin.allocRemaining(arena, .unlimited);
+            const input = try stdin.allocRemaining(gpa, .unlimited);
+            defer gpa.free(input);
 
             // Initialize the Lua vm
-            var lua = try Lua.init(arena);
+            var lua = try Lua.init(gpa);
             defer lua.deinit();
 
             // https://luascripts.com/lua-embed
             // https://piembsystech.com/integrating-lua-as-a-scripting-language-in-c-c-applications/
+            // https://piembsystech.com/working-with-modules-and-packages-in-lua-programming/
             lua.openLibs();
 
             try lua.doFile("lua/init.lua");
@@ -80,7 +83,8 @@ pub fn main() !void {
 
             catted_anything = true;
             var file_reader = file.reader(&.{});
-            const input = try file_reader.interface.allocRemaining(arena, .unlimited);
+            const input = try file_reader.interface.allocRemaining(gpa, .unlimited);
+            defer gpa.free(input);
 
             try clipboard_lib.write(input);
 
@@ -90,7 +94,8 @@ pub fn main() !void {
     }
     if (!catted_anything) {
         const stdin = &stdin_reader.interface;
-        const input = try stdin.allocRemaining(arena, .unlimited);
+        const input = try stdin.allocRemaining(gpa, .unlimited);
+        defer gpa.free(input);
 
         try clipboard_lib.write(input);
 
