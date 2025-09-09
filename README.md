@@ -11,6 +11,7 @@ Hackable clipboard manager
 ## Features
 
 - [ ] SQLite storage
+- [ ] [XDG](https://specifications.freedesktop.org/basedir-spec/latest/) support for storing configs
 - [ ] Clipboard transforms via [Lua](https://www.lua.org)
 - [ ] Clipboard workflows. Example paste login and password
 - [ ] CLI/TUI native. Usable with [neovim](https://neovim.io), [tmux](https://github.com/tmux/tmux) and [fzf](https://junegunn.github.io/fzf/)
