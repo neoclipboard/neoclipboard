@@ -3,6 +3,7 @@ const std = @import("std");
 // third-party
 const clipboard_lib = @import("clipboard");
 const zlua = @import("zlua");
+const sqlite = @import("sqlite");
 
 // local
 const nclip_lib = @import("neoclipboard");
@@ -13,6 +14,8 @@ const Lua = zlua.Lua;
 // This can be global since stdout is a singleton.
 var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
+const Clipboard = struct { body: sqlite.Text, timestamp: i64 };
+
 pub fn main() !void {
     // // Prints to stderr, ignoring potential errors.
     // try nclip_lib.bufferedPrint();
@@ -22,7 +25,29 @@ pub fn main() !void {
     defer arena_instance.deinit();
     const gpa = arena_instance.allocator();
 
-    const args = try std.process.argsAlloc(gpa);
+    const args = std.process.argsAlloc(gpa) catch {
+        std.debug.print("Failed to allocate args\n", .{});
+        return;
+    };
+    defer std.process.argsFree(gpa, args);
+
+    const cwd = std.fs.cwd();
+
+    // Get the real path of the current working directory
+    // https://github.com/ziglang/zig/issues/19353
+    const cwd_path = try cwd.realpathAlloc(gpa, ".");
+    defer gpa.free(cwd_path);
+
+    // Join the cwd path with "db.sqlite"
+    const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
+    defer gpa.free(db_path);
+
+    std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
+
+    const db = try sqlite.Database.open(.{ .path = "db.sqlite" });
+    defer db.close();
+
+    try setupDb(&db);
 
     const exe = args[0];
     var catted_anything = false;
@@ -30,8 +55,6 @@ pub fn main() !void {
     const stdout = &stdout_writer.interface;
     // NOTE: I am not sure why in zig they are using buffered stdin, empty buffer works fine as well
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
-
-    const cwd = std.fs.cwd();
 
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "-")) {
@@ -44,6 +67,10 @@ pub fn main() !void {
 
             try stdout.writeAll(input);
             try stdout.flush();
+
+            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            try saveClipboard(&db, &current_clipboard);
+
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
             try stdout.writeAll(clipboard_lib.read() catch "");
@@ -74,6 +101,11 @@ pub fn main() !void {
 
             try stdout.writeAll(result);
             try stdout.flush();
+
+            // TODO: save before transform, after transform, replace with transform
+            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            try saveClipboard(&db, &current_clipboard);
+
             return;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
@@ -90,6 +122,10 @@ pub fn main() !void {
 
             try stdout.writeAll(input);
             try stdout.flush();
+
+            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            try saveClipboard(&db, &current_clipboard);
+
         }
     }
     if (!catted_anything) {
@@ -101,6 +137,10 @@ pub fn main() !void {
 
         try stdout.writeAll(input);
         try stdout.flush();
+
+        var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+        try saveClipboard(&db, &current_clipboard);
+
     }
 
 }
@@ -108,6 +148,18 @@ pub fn main() !void {
 fn usage(exe: []const u8) !void {
     std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
+}
+
+fn setupDb(db: *const sqlite.Database) !void {
+    std.debug.print("Setting up database\n", .{});
+    try db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
+}
+
+fn saveClipboard(db: *const sqlite.Database, clipboard: *const Clipboard) !void {
+    std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
+    const insert = try db.prepare(Clipboard, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
+    defer insert.finalize();
+    try insert.exec(clipboard.*);
 }
 
 test "simple test" {
