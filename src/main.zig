@@ -52,6 +52,20 @@ const Storage = struct {
         try insert.exec(clipboard.*);
     }
 
+    pub fn read(self: Self, gpa: std.mem.Allocator) !*std.ArrayList(Clipboard) {
+        std.debug.print("Reading storage\n", .{});
+        const select = try self.db.prepare(struct {}, Clipboard, "SELECT * FROM clipboard");
+        defer select.finalize();
+        try select.bind(.{});
+        defer select.reset();
+
+        var clipboards: std.ArrayList(Clipboard) = .empty;
+        while (try select.step()) |clipboard| {
+            try clipboards.append(gpa, clipboard);
+        }
+        return &clipboards;
+    }
+
     pub fn teardown(self: Self) void {
         self.db.close();
     }
@@ -106,6 +120,16 @@ pub fn main() !void {
             try stdout.flush();
             return;
         } else if (std.mem.eql(u8, arg, "-l")) {
+            const clipboards = try storage.read(gpa);
+            // TODO: fails for some reason
+            // defer clipboards.deinit(gpa);
+
+            for (clipboards.items) |clipboard| {
+                try stdout.print("body: {s}, timestamp: {d}\n\n", .{ clipboard.body.data, clipboard.timestamp });
+            }
+            try stdout.flush();
+            return;
+        } else if (std.mem.eql(u8, arg, "-t")) {
             const stdin = &stdin_reader.interface;
             const input = try stdin.allocRemaining(gpa, .unlimited);
             defer gpa.free(input);
