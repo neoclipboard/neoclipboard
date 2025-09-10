@@ -16,6 +16,47 @@ var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
 const Clipboard = struct { body: sqlite.Text, timestamp: i64 };
 
+const Storage = struct {
+    const Self = @This();
+
+    db: sqlite.Database,
+
+    pub fn init() Self {
+        return .{
+            .db = undefined,
+        };
+    }
+
+    pub fn setup(self: *Self, gpa: std.mem.Allocator, cwd: std.fs.Dir) !void {
+        // Get the real path of the current working directory
+        // https://github.com/ziglang/zig/issues/19353
+        const cwd_path = try cwd.realpathAlloc(gpa, ".");
+        defer gpa.free(cwd_path);
+
+        // Join the cwd path with "db.sqlite"
+        const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
+        defer gpa.free(db_path);
+
+        std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
+
+        self.db = try sqlite.Database.open(.{ .path = "db.sqlite" });
+
+        std.debug.print("Setting up database\n", .{});
+        try self.db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
+    }
+
+    pub fn write(self: Self, clipboard: *Clipboard) !void {
+        std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
+        const insert = try self.db.prepare(Clipboard, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
+        defer insert.finalize();
+        try insert.exec(clipboard.*);
+    }
+
+    pub fn teardown(self: Self) void {
+        self.db.close();
+    }
+};
+
 pub fn main() !void {
     // // Prints to stderr, ignoring potential errors.
     // try nclip_lib.bufferedPrint();
@@ -33,21 +74,9 @@ pub fn main() !void {
 
     const cwd = std.fs.cwd();
 
-    // Get the real path of the current working directory
-    // https://github.com/ziglang/zig/issues/19353
-    const cwd_path = try cwd.realpathAlloc(gpa, ".");
-    defer gpa.free(cwd_path);
-
-    // Join the cwd path with "db.sqlite"
-    const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
-    defer gpa.free(db_path);
-
-    std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
-
-    const db = try sqlite.Database.open(.{ .path = "db.sqlite" });
-    defer db.close();
-
-    try setupDb(&db);
+    var storage: Storage = .init();
+    try storage.setup(gpa, cwd);
+    defer storage.teardown();
 
     const exe = args[0];
     var catted_anything = false;
@@ -69,7 +98,7 @@ pub fn main() !void {
             try stdout.flush();
 
             var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-            try saveClipboard(&db, &current_clipboard);
+            try storage.write(&current_clipboard);
 
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
@@ -104,7 +133,7 @@ pub fn main() !void {
 
             // TODO: save before transform, after transform, replace with transform
             var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-            try saveClipboard(&db, &current_clipboard);
+            try storage.write(&current_clipboard);
 
             return;
         } else if (std.mem.startsWith(u8, arg, "-")) {
@@ -124,7 +153,7 @@ pub fn main() !void {
             try stdout.flush();
 
             var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-            try saveClipboard(&db, &current_clipboard);
+            try storage.write(&current_clipboard);
 
         }
     }
@@ -139,7 +168,7 @@ pub fn main() !void {
         try stdout.flush();
 
         var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-        try saveClipboard(&db, &current_clipboard);
+        try storage.write(&current_clipboard);
 
     }
 
@@ -148,18 +177,6 @@ pub fn main() !void {
 fn usage(exe: []const u8) !void {
     std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
-}
-
-fn setupDb(db: *const sqlite.Database) !void {
-    std.debug.print("Setting up database\n", .{});
-    try db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
-}
-
-fn saveClipboard(db: *const sqlite.Database, clipboard: *const Clipboard) !void {
-    std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
-    const insert = try db.prepare(Clipboard, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
-    defer insert.finalize();
-    try insert.exec(clipboard.*);
 }
 
 test "simple test" {
