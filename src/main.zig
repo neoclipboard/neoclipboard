@@ -15,7 +15,7 @@ const Lua = zlua.Lua;
 // This can be global since stdout is a singleton.
 var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
-const ClipboardModel = struct { body: sqlite.Text, timestamp: i64 };
+const ClipboardModel = struct { id: ?i64 = null, body: sqlite.Text, timestamp: i64 };
 
 const Clipboard = struct { body: []u8, timestamp: i64 };
 
@@ -50,20 +50,21 @@ const Storage = struct {
 
     pub fn write(self: Self, clipboard: *ClipboardModel) !void {
         std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
-        const insert = try self.db.prepare(ClipboardModel, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
+        const insert = try self.db.prepare(ClipboardModel, void, "INSERT INTO clipboard VALUES (:id, :body, :timestamp)");
         defer insert.finalize();
         try insert.exec(clipboard.*);
     }
 
-    pub fn read(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
+    pub fn list(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
         std.debug.print("Reading storage\n", .{});
-        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT * FROM clipboard");
+        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard");
         defer select.finalize();
         try select.bind(.{});
         defer select.reset();
 
         var clipboards: std.ArrayList(Clipboard) = .empty;
         while (try select.step()) |clipboard| {
+            // Text and blob values must not be retained across steps. You are responsible for copying them.
             const clipboard_copy = Clipboard{ .body = try arena.dupe(u8, clipboard.body.data), .timestamp = clipboard.timestamp };
 
             try clipboards.append(arena, clipboard_copy);
@@ -137,11 +138,11 @@ pub fn main() !void {
             try storage.write(&current_clipboard);
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
-            try stdout.writeAll(clipboard_lib.read() catch "");
+            try stdout.writeAll(clipboard_lib.read() catch @panic("can't read clipboard"));
             try stdout.flush();
             return;
         } else if (std.mem.eql(u8, arg, "-l")) {
-            const clipboards = try storage.read(arena);
+            const clipboards = try storage.list(arena);
 
             for (clipboards.items) |clipboard| {
                 try stdout.print("body: {s}, timestamp: {d}\n\n", .{ clipboard.body, clipboard.timestamp });
