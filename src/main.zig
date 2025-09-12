@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 // third-party
 const clipboard_lib = @import("clipboard");
@@ -14,7 +15,9 @@ const Lua = zlua.Lua;
 // This can be global since stdout is a singleton.
 var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
-const Clipboard = struct { body: sqlite.Text, timestamp: i64 };
+const ClipboardModel = struct { body: sqlite.Text, timestamp: i64 };
+
+const Clipboard = struct { body: []u8, timestamp: i64 };
 
 const Storage = struct {
     const Self = @This();
@@ -45,23 +48,25 @@ const Storage = struct {
         try self.db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
     }
 
-    pub fn write(self: Self, clipboard: *Clipboard) !void {
+    pub fn write(self: Self, clipboard: *ClipboardModel) !void {
         std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
-        const insert = try self.db.prepare(Clipboard, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
+        const insert = try self.db.prepare(ClipboardModel, void, "INSERT INTO clipboard VALUES (NULL, :body, :timestamp)");
         defer insert.finalize();
         try insert.exec(clipboard.*);
     }
 
-    pub fn read(self: Self, gpa: std.mem.Allocator) !*std.ArrayList(Clipboard) {
+    pub fn read(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
         std.debug.print("Reading storage\n", .{});
-        const select = try self.db.prepare(struct {}, Clipboard, "SELECT * FROM clipboard");
+        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT * FROM clipboard");
         defer select.finalize();
         try select.bind(.{});
         defer select.reset();
 
         var clipboards: std.ArrayList(Clipboard) = .empty;
         while (try select.step()) |clipboard| {
-            try clipboards.append(gpa, clipboard);
+            const clipboard_copy = Clipboard{ .body = try arena.dupe(u8, clipboard.body.data), .timestamp = clipboard.timestamp };
+
+            try clipboards.append(arena, clipboard_copy);
         }
         return &clipboards;
     }
@@ -71,14 +76,31 @@ const Storage = struct {
     }
 };
 
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !void {
     // // Prints to stderr, ignoring potential errors.
     // try nclip_lib.bufferedPrint();
 
-    // TODO: Replace with GPA because we do not want to keep holding memory after clipboard redices
-    var arena_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena_instance.deinit();
-    const gpa = arena_instance.allocator();
+    // copied from zig's src/main.zig
+    const gpa, const is_debug = gpa: {
+        switch (builtin.mode) {
+            .Debug => {
+                break :gpa .{ debug_allocator.allocator(), true };
+            },
+            else => {
+                break :gpa .{ std.heap.page_allocator, false };
+            },
+        }
+    };
+
+    defer if (is_debug) {
+        defer std.testing.expect(debug_allocator.deinit() == .ok) catch @panic("leak");
+    };
+
+    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    defer arena_allocator.deinit();
+    const arena = arena_allocator.allocator();
 
     const args = std.process.argsAlloc(gpa) catch {
         std.debug.print("Failed to allocate args\n", .{});
@@ -111,21 +133,18 @@ pub fn main() !void {
             try stdout.writeAll(input);
             try stdout.flush();
 
-            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
-
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
             try stdout.writeAll(clipboard_lib.read() catch "");
             try stdout.flush();
             return;
         } else if (std.mem.eql(u8, arg, "-l")) {
-            const clipboards = try storage.read(gpa);
-            // TODO: fails for some reason
-            // defer clipboards.deinit(gpa);
+            const clipboards = try storage.read(arena);
 
             for (clipboards.items) |clipboard| {
-                try stdout.print("body: {s}, timestamp: {d}\n\n", .{ clipboard.body.data, clipboard.timestamp });
+                try stdout.print("body: {s}, timestamp: {d}\n\n", .{ clipboard.body, clipboard.timestamp });
             }
             try stdout.flush();
             return;
@@ -156,7 +175,7 @@ pub fn main() !void {
             try stdout.flush();
 
             // TODO: save before transform, after transform, replace with transform
-            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
 
             return;
@@ -176,9 +195,8 @@ pub fn main() !void {
             try stdout.writeAll(input);
             try stdout.flush();
 
-            var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
-
         }
     }
     if (!catted_anything) {
@@ -191,11 +209,9 @@ pub fn main() !void {
         try stdout.writeAll(input);
         try stdout.flush();
 
-        var current_clipboard = Clipboard{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+        var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
         try storage.write(&current_clipboard);
-
     }
-
 }
 
 fn usage(exe: []const u8) !void {

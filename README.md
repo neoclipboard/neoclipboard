@@ -37,3 +37,7 @@ Or
 $ zig build
 $ ./zig-out/bin/nclip
 ```
+
+## TODO
+
+- handle null bytes in strings?
