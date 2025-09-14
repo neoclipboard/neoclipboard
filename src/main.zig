@@ -143,7 +143,8 @@ pub fn main() !void {
             const clipboards = try storage.list(arena);
 
             for (clipboards.items) |clipboard| {
-                try stdout.print("body: {s}, timestamp: {d}\n\n", .{ clipboard.body, clipboard.timestamp });
+                // print ending with NUL ascii to handle multi-line clipboards
+                try stdout.print("{s}\x00", .{ clipboard.body });
             }
             try stdout.flush();
             return;
