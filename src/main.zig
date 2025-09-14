@@ -13,6 +13,8 @@ const Lua = zlua.Lua;
 
 // copied from zig's src/main.zig:69
 // This can be global since stdout is a singleton.
+// TODO: We needed writer buffer only for `sendFileAll`, but now we do not use it anymore
+// https://ziggit.dev/t/pr-24858-changed-sendfileall-and-now-it-always-requires-a-buffer-can-somebody-please-help-me-understand-why-this-ok/12046
 var stdout_buffer: [4096]u8 align(std.heap.page_size_min) = undefined;
 
 const ClipboardModel = struct { id: ?i64 = null, body: sqlite.Text, timestamp: i64 };
@@ -22,28 +24,15 @@ const Clipboard = struct { body: []u8, timestamp: i64 };
 const Storage = struct {
     const Self = @This();
 
-    db: sqlite.Database,
+    db: *const sqlite.Database,
 
-    pub fn init() Self {
+    pub fn init(db: *const sqlite.Database) Self {
         return .{
-            .db = undefined,
+            .db = db,
         };
     }
 
-    pub fn setup(self: *Self, gpa: std.mem.Allocator, cwd: std.fs.Dir) !void {
-        // Get the real path of the current working directory
-        // https://github.com/ziglang/zig/issues/19353
-        const cwd_path = try cwd.realpathAlloc(gpa, ".");
-        defer gpa.free(cwd_path);
-
-        // Join the cwd path with "db.sqlite"
-        const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
-        defer gpa.free(db_path);
-
-        std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
-
-        self.db = try sqlite.Database.open(.{ .path = "db.sqlite" });
-
+    pub fn setup(self: Self) !void {
         std.debug.print("Setting up database\n", .{});
         try self.db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
     }
@@ -70,10 +59,6 @@ const Storage = struct {
             try clipboards.append(arena, clipboard_copy);
         }
         return &clipboards;
-    }
-
-    pub fn teardown(self: Self) void {
-        self.db.close();
     }
 };
 
@@ -111,9 +96,22 @@ pub fn main() !void {
 
     const cwd = std.fs.cwd();
 
-    var storage: Storage = .init();
-    try storage.setup(gpa, cwd);
-    defer storage.teardown();
+    // Get the real path of the current working directory
+    // https://github.com/ziglang/zig/issues/19353
+    const cwd_path = try cwd.realpathAlloc(gpa, ".");
+    defer gpa.free(cwd_path);
+
+    // Join the cwd path with "db.sqlite"
+    const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
+    defer gpa.free(db_path);
+
+    std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
+
+    const db = try sqlite.Database.open(.{ .path = "db.sqlite" });
+    defer db.close();
+
+    var storage: Storage = .init(&db);
+    try storage.setup();
 
     const exe = args[0];
     var catted_anything = false;
@@ -220,21 +218,88 @@ fn usage(exe: []const u8) !void {
     return error.Invalid;
 }
 
-test "simple test" {
-    const gpa = std.testing.allocator;
-    var list: std.ArrayList(i32) = .empty;
-    defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(gpa, 42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+test {
+    std.testing.refAllDeclsRecursive(@This());
 }
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+test "storage write" {
+    const db = try sqlite.Database.open(.{});
+    defer db.close();
+
+    const storage: Storage = .init(&db);
+    try storage.setup();
+    var input_clipboard = ClipboardModel{ .body = sqlite.text("test"), .timestamp = std.time.timestamp() };
+    try storage.write(&input_clipboard);
+
+    const select = try db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard");
+    defer select.finalize();
+    try select.bind(.{});
+    defer select.reset();
+
+    while (try select.step()) |clipboard| {
+        // Text and blob values must not be retained across steps. You are responsible for copying them.
+
+        try std.testing.expectEqualStrings(clipboard.body.data, "test");
+    }
 }
+
+test "storage list" {
+    const gpa = std.testing.allocator;
+    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    defer arena_allocator.deinit();
+    const arena = arena_allocator.allocator();
+
+    const db = try sqlite.Database.open(.{});
+    defer db.close();
+
+    const storage: Storage = .init(&db);
+    try storage.setup();
+
+    const input_clipboard = ClipboardModel{ .body = sqlite.text("test"), .timestamp = std.time.timestamp() };
+    const insert = try db.prepare(ClipboardModel, void, "INSERT INTO clipboard VALUES (:id, :body, :timestamp)");
+    defer insert.finalize();
+    try insert.exec(input_clipboard);
+
+    const clipboards = try storage.list(arena);
+    for (clipboards.items) |clipboard| {
+        try std.testing.expectEqualStrings(clipboard.body, "test");
+    }
+}
+
+test "storage list after write" {
+    const gpa = std.testing.allocator;
+    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    defer arena_allocator.deinit();
+    const arena = arena_allocator.allocator();
+
+    const db = try sqlite.Database.open(.{});
+    defer db.close();
+
+    const storage: Storage = .init(&db);
+    try storage.setup();
+    var input_clipboard = ClipboardModel{ .body = sqlite.text("test"), .timestamp = std.time.timestamp() };
+    try storage.write(&input_clipboard);
+    const clipboards = try storage.list(arena);
+    for (clipboards.items) |clipboard| {
+        try std.testing.expectEqualStrings(clipboard.body, "test");
+    }
+}
+
+// test "simple test" {
+//     const gpa = std.testing.allocator;
+//     var list: std.ArrayList(i32) = .empty;
+//     defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
+//     try list.append(gpa, 42);
+//     try std.testing.expectEqual(@as(i32, 42), list.pop());
+// }
+
+// test "fuzz example" {
+//     const Context = struct {
+//         fn testOne(context: @This(), input: []const u8) anyerror!void {
+//             _ = context;
+//             // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
+//             try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
+//         }
+//     };
+//     try std.testing.fuzz(Context{}, Context.testOne, .{});
+// }
