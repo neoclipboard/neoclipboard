@@ -51,7 +51,7 @@ const Storage = struct {
 
     pub fn last(self: Self, arena: std.mem.Allocator) !*Clipboard {
         std.debug.print("Reading storage\n", .{});
-        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard LIMIT 1");
+        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard ORDER BY id DESC LIMIT 1");
         defer select.finalize();
         try select.bind(.{});
         defer select.reset();
@@ -68,7 +68,7 @@ const Storage = struct {
 
     pub fn list(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
         std.debug.print("Reading storage\n", .{});
-        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard");
+        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard ORDER BY id DESC");
         defer select.finalize();
         try select.bind(.{});
         defer select.reset();
