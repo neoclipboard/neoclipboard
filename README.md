@@ -83,3 +83,29 @@ List from storage with fzf
 ```console
 $ nclip -l | fzf --read0
 ```
+
+### Lua tranforms
+
+```console
+$ mkdir -p ~/.config/nclip/lua/
+$ touch ~/.config/nclip/lua/init.lua
+echo "
+```
+
+Update `~/.config/nclip/lua/init.lua`:
+
+```lua
+package.path = package.path .. ";./lua/?.lua"
+
+function upper(input)
+   return string.upper(input)
+end
+
+function trim(input)
+   return input:gsub("%s+", "")
+end
+
+function trim_upper(input)
+   return trim(upper(input))
+end
+```

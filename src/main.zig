@@ -137,6 +137,14 @@ pub fn main() !u8 {
     const data_path = try data_path_dir.?.realpathAlloc(gpa, "nclip");
     defer gpa.free(data_path);
 
+    const config_path_dir = try known_folders.open(gpa, known_folders.KnownFolder.local_configuration, .{});
+
+    _ = config_path_dir.?.access("nclip", .{}) catch {
+        try config_path_dir.?.makeDir("nclip");
+    };
+    const config_path = try config_path_dir.?.realpathAlloc(gpa, "nclip");
+    defer gpa.free(config_path);
+
     const db_path = try std.fs.path.joinZ(gpa, &.{ data_path, "db.sqlite" });
     // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ data_path, "db.sqlite" });
     defer gpa.free(db_path);
@@ -191,6 +199,7 @@ pub fn main() !u8 {
             try stdout.flush();
             return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
+            // TODO: handle transform names
             const stdin = &stdin_reader.interface;
             const input = try stdin.allocRemaining(gpa, .unlimited);
             defer gpa.free(input);
@@ -204,7 +213,9 @@ pub fn main() !u8 {
             // https://piembsystech.com/working-with-modules-and-packages-in-lua-programming/
             lua.openLibs();
 
-            try lua.doFile("lua/init.lua");
+            const lua_path = try std.fs.path.joinZ(gpa, &.{ config_path, "lua", "init.lua" });
+            defer gpa.free(lua_path);
+            try lua.doFile(lua_path);
             _ = try lua.getGlobal("trim_upper");
             try lua.pushAny(input);
             try lua.protectedCall(.{ .args = 1, .results = 1 });
