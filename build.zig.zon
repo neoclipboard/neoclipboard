@@ -73,6 +73,10 @@
             .url = "https://github.com/nDimensional/zig-sqlite/archive/refs/tags/v0.3.2-3500400.tar.gz",
             .hash = "sqlite-0.3.2-3500400-djiKTq2AAAAliqm-sDGDX5m_-QORgokyd5JvmKkEidCg",
         },
+        .known_folders = .{
+            .url = "git+https://github.com/ziglibs/known-folders.git#ab5cf5feb936fa3b72c95d3ad0c0c67791937ba1",
+            .hash = "known_folders-0.0.0-Fy-PJtTTAADUOhGKM0sxzG4eMkNQxRvx9e5dfHVyaeA3",
+        },
     },
     // Specifies the set of files and directories that are included in this package.
     // Only files and directories listed here are included in the `hash` that

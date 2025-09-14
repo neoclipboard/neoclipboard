@@ -98,6 +98,8 @@ pub fn build(b: *std.Build) void {
     // https://github.com/nDimensional/zig-sqlite
     exe.root_module.addImport("sqlite", b.dependency("sqlite", .{}).module("sqlite"));
 
+    // https://github.com/ziglibs/known-folders
+    exe.root_module.addImport("known-folders", b.dependency("known_folders", .{}).module("known-folders"));
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
