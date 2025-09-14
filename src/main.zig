@@ -49,6 +49,23 @@ const Storage = struct {
         try insert.exec(clipboard.*);
     }
 
+    pub fn last(self: Self, arena: std.mem.Allocator) !*Clipboard {
+        std.debug.print("Reading storage\n", .{});
+        const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard LIMIT 1");
+        defer select.finalize();
+        try select.bind(.{});
+        defer select.reset();
+
+        var clipboard_copy: Clipboard = undefined;
+        while (try select.step()) |clipboard| {
+            // Text and blob values must not be retained across steps. You are responsible for copying them.
+            clipboard_copy = Clipboard{ .body = try arena.dupe(u8, clipboard.body.data), .timestamp = clipboard.timestamp };
+
+        }
+        // TODO: handle empty storage
+        return &clipboard_copy;
+    }
+
     pub fn list(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
         std.debug.print("Reading storage\n", .{});
         const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard");
@@ -156,6 +173,11 @@ pub fn main() !void {
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
             try stdout.writeAll(clipboard_lib.read() catch @panic("can't read clipboard"));
+            try stdout.flush();
+            return;
+        } else if (std.mem.eql(u8, arg, "-t")) {
+            const clipboard = try storage.last(arena);
+            try stdout.writeAll(clipboard.body);
             try stdout.flush();
             return;
         } else if (std.mem.eql(u8, arg, "-l")) {
