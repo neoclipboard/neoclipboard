@@ -11,10 +11,10 @@ Hackable clipboard manager
 ## Features
 
 - [x] SQLite storage
-- [ ] [XDG](https://specifications.freedesktop.org/basedir-spec/latest/) support for storing configs
+- [x] [XDG](https://specifications.freedesktop.org/basedir-spec/latest/) support for storing configs
 - [x] Clipboard transforms via [Lua](https://www.lua.org)
 - [ ] Clipboard workflows. Example paste login and password
-- [ ] CLI/TUI native. Usable with [neovim](https://neovim.io), [tmux](https://github.com/tmux/tmux) and [fzf](https://junegunn.github.io/fzf/)
+- [x] CLI/TUI native. Usable with [neovim](https://neovim.io), [tmux](https://github.com/tmux/tmux) and [fzf](https://junegunn.github.io/fzf/)
 - [ ] Application groups
 - [ ] Native UX. Follow [ghostty](https://ghostty.org) example
 - [ ] Secure storage
@@ -41,3 +41,45 @@ $ ./zig-out/bin/nclip
 ## TODO
 
 - handle null bytes in strings?
+
+## Configure with vim and tmux
+
+Update `init.lua`:
+
+```lua
+vim.g.clipboard = {
+    name = 'myClipboard',
+    copy = {
+        ["*"] = {'nclip', '-'},
+    },
+    paste = {
+        ["*"] = {'nclip', '-h'},
+    },
+}
+```
+
+Update `tmux.conf`:
+
+```tmux
+bind-key -T copy-mode-vi Y send-keys -X copy-pipe "nclip -"
+bind-key -T copy-mode-vi M-Y send-keys -X copy-pipe-and-cancel "nclip -"
+bind-key P run-shell "nclip -h | tmux load-buffer - && tmux paste-buffer"
+bind-key Y run-shell "tmux save-buffer - | nclip -"
+```
+
+## Usage
+
+```console
+nclip:
+    -o: Output clipboard (bypass storage)
+    -h: Output last clipboard from storage
+    -l: List clipboards from storage (NUL terminated for fzf usage)
+    -: accept stdin
+    file_name: copy file
+```
+
+List from storage with fzf
+
+```console
+$ nclip -l | fzf --read0
+```

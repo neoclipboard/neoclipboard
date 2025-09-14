@@ -38,19 +38,19 @@ const Storage = struct {
     }
 
     pub fn setup(self: Self) !void {
-        std.debug.print("Setting up database\n", .{});
+        // std.debug.print("Setting up database\n", .{});
         try self.db.exec("CREATE TABLE IF NOT EXISTS clipboard (id INTEGER PRIMARY KEY, body TEXT, timestamp INTEGER)", .{});
     }
 
     pub fn write(self: Self, clipboard: *ClipboardModel) !void {
-        std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
+        // std.debug.print("Saving to clipboard: \"{s}\", at {d}\n", .{ clipboard.body.data, clipboard.timestamp });
         const insert = try self.db.prepare(ClipboardModel, void, "INSERT INTO clipboard VALUES (:id, :body, :timestamp)");
         defer insert.finalize();
         try insert.exec(clipboard.*);
     }
 
     pub fn last(self: Self, arena: std.mem.Allocator) !*Clipboard {
-        std.debug.print("Reading storage\n", .{});
+        // std.debug.print("Reading storage\n", .{});
         const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard ORDER BY id DESC LIMIT 1");
         defer select.finalize();
         try select.bind(.{});
@@ -67,7 +67,7 @@ const Storage = struct {
     }
 
     pub fn list(self: Self, arena: std.mem.Allocator) !*std.ArrayList(Clipboard) {
-        std.debug.print("Reading storage\n", .{});
+        // std.debug.print("Reading storage\n", .{});
         const select = try self.db.prepare(struct {}, ClipboardModel, "SELECT id, body, timestamp FROM clipboard ORDER BY id DESC");
         defer select.finalize();
         try select.bind(.{});
@@ -86,7 +86,7 @@ const Storage = struct {
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
-pub fn main() !void {
+pub fn main() !u8 {
     // // Prints to stderr, ignoring potential errors.
     // try nclip_lib.bufferedPrint();
 
@@ -112,7 +112,7 @@ pub fn main() !void {
 
     const args = std.process.argsAlloc(gpa) catch {
         std.debug.print("Failed to allocate args\n", .{});
-        return;
+        return 2;
     };
     defer std.process.argsFree(gpa, args);
 
@@ -141,7 +141,7 @@ pub fn main() !void {
     // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ data_path, "db.sqlite" });
     defer gpa.free(db_path);
 
-    std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
+    // std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
 
     const db = try sqlite.Database.open(.{ .path = db_path });
     defer db.close();
@@ -170,16 +170,17 @@ pub fn main() !void {
 
             var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
+            return 0;
         } else if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
             try stdout.writeAll(clipboard_lib.read() catch @panic("can't read clipboard"));
             try stdout.flush();
-            return;
-        } else if (std.mem.eql(u8, arg, "-t")) {
+            return 0;
+        } else if (std.mem.eql(u8, arg, "-h")) {
             const clipboard = try storage.last(arena);
             try stdout.writeAll(clipboard.body);
             try stdout.flush();
-            return;
+            return 0;
         } else if (std.mem.eql(u8, arg, "-l")) {
             const clipboards = try storage.list(arena);
 
@@ -188,7 +189,7 @@ pub fn main() !void {
                 try stdout.print("{s}\x00", .{ clipboard.body });
             }
             try stdout.flush();
-            return;
+            return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
             const stdin = &stdin_reader.interface;
             const input = try stdin.allocRemaining(gpa, .unlimited);
@@ -219,7 +220,7 @@ pub fn main() !void {
             var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
 
-            return;
+            return 0;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
@@ -252,10 +253,12 @@ pub fn main() !void {
 
         var current_clipboard = ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
         try storage.write(&current_clipboard);
+        return 0;
     }
+    return 1;
 }
 
-fn usage(exe: []const u8) !void {
+fn usage(exe: []const u8) !u8 {
     std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
 }
