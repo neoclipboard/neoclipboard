@@ -5,11 +5,16 @@ const builtin = @import("builtin");
 const clipboard_lib = @import("clipboard");
 const zlua = @import("zlua");
 const sqlite = @import("sqlite");
+const known_folders = @import("known-folders");
 
 // local
 const nclip_lib = @import("neoclipboard");
 
 const Lua = zlua.Lua;
+
+pub const known_folders_config: known_folders.KnownFolderConfig = .{
+    .xdg_on_mac = true,
+};
 
 // copied from zig's src/main.zig:69
 // This can be global since stdout is a singleton.
@@ -96,18 +101,32 @@ pub fn main() !void {
 
     const cwd = std.fs.cwd();
 
-    // Get the real path of the current working directory
-    // https://github.com/ziglang/zig/issues/19353
-    const cwd_path = try cwd.realpathAlloc(gpa, ".");
-    defer gpa.free(cwd_path);
+    // // Get the real path of the current working directory
+    // // https://github.com/ziglang/zig/issues/19353
+    // const cwd_path = try cwd.realpathAlloc(gpa, ".");
+    // defer gpa.free(cwd_path);
+    //
+    // // Join the cwd path with "db.sqlite"
+    // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
+    // defer gpa.free(db_path);
+    //
+    // std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
 
-    // Join the cwd path with "db.sqlite"
-    const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
+    const data_path_dir = try known_folders.open(gpa, known_folders.KnownFolder.data, .{});
+
+    _ = data_path_dir.?.access("nclip", .{}) catch {
+        try data_path_dir.?.makeDir("nclip");
+    };
+    const data_path = try data_path_dir.?.realpathAlloc(gpa, "nclip");
+    defer gpa.free(data_path);
+
+    const db_path = try std.fs.path.joinZ(gpa, &.{ data_path, "db.sqlite" });
+    // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ data_path, "db.sqlite" });
     defer gpa.free(db_path);
 
     std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
 
-    const db = try sqlite.Database.open(.{ .path = "db.sqlite" });
+    const db = try sqlite.Database.open(.{ .path = db_path });
     defer db.close();
 
     var storage: Storage = .init(&db);
