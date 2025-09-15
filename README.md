@@ -48,12 +48,12 @@ Update `init.lua`:
 
 ```lua
 vim.g.clipboard = {
-    name = 'myClipboard',
+    name = 'nclip',
     copy = {
-        ["*"] = {'nclip', '-'},
+        ["*"] = {'ncopy', '-'},
     },
     paste = {
-        ["*"] = {'nclip', '-h'},
+        ["*"] = {'npaste', '-h'},
     },
 }
 ```
@@ -61,27 +61,28 @@ vim.g.clipboard = {
 Update `tmux.conf`:
 
 ```tmux
-bind-key -T copy-mode-vi Y send-keys -X copy-pipe "nclip -"
-bind-key -T copy-mode-vi M-Y send-keys -X copy-pipe-and-cancel "nclip -"
-bind-key P run-shell "nclip -h | tmux load-buffer - && tmux paste-buffer"
-bind-key Y run-shell "tmux save-buffer - | nclip -"
+bind-key -T copy-mode-vi Y send-keys -X copy-pipe "ncopy -"
+bind-key -T copy-mode-vi M-Y send-keys -X copy-pipe-and-cancel "ncopy -"
+bind-key P run-shell "npaste -h | tmux load-buffer - && tmux paste-buffer"
+bind-key Y run-shell "tmux save-buffer - | ncopy -"
 ```
 
 ## Usage
 
 ```console
-nclip:
+ncopy:
+    -: accept stdin
+    file_name: copy file
+npaste:
     -o: Output clipboard (bypass storage)
     -h: Output last clipboard from storage
     -l: List clipboards from storage (NUL terminated for fzf usage)
-    -: accept stdin
-    file_name: copy file
 ```
 
 List from storage with fzf
 
 ```console
-$ nclip -l | fzf --read0
+$ npaste -l | fzf --read0
 ```
 
 ### Lua tranforms
