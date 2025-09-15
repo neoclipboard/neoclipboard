@@ -1,3 +1,7 @@
+// TODO:
+// - Edit clipboard via $EDITOR
+// - Tranform on copy
+
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -96,31 +100,27 @@ pub fn main() !u8 {
     try storage.setup();
 
     const exe = args[0];
-    var catted_anything = false;
+    var copied_anything = false;
     var stdout_writer = std.fs.File.stdout().writerStreaming(&stdout_buffer);
     const stdout = &stdout_writer.interface;
     // NOTE: I am not sure why in zig they are using buffered stdin, empty buffer works fine as well
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
+    const stdin = &stdin_reader.interface;
 
-    for (args[1..]) |arg| {
+    var args_num: usize = 1;
+
+    while (args_num < args.len) {
+        const arg = args[args_num];
+
         if (std.mem.eql(u8, arg, "-")) {
-            catted_anything = true;
-            const stdin = &stdin_reader.interface;
-            const input = try stdin.allocRemaining(gpa, .unlimited);
-            defer gpa.free(input);
-
-            try clipboard_lib.write(input);
-
-            try stdout.writeAll(input);
-            try stdout.flush();
-
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-            try storage.write(&current_clipboard);
+            copied_anything = true;
+            try processStdIn(gpa, &storage, stdin, stdout);
             return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
             // TODO: fix imports for lua files
-            // TODO: handle transform names
-            const stdin = &stdin_reader.interface;
+            args_num += 1;
+            const transform = args[args_num];
+
             const input = try stdin.allocRemaining(gpa, .unlimited);
             defer gpa.free(input);
 
@@ -136,7 +136,7 @@ pub fn main() !u8 {
             const lua_path = try std.fs.path.joinZ(gpa, &.{ config_path, "lua", "init.lua" });
             defer gpa.free(lua_path);
             try lua.doFile(lua_path);
-            _ = try lua.getGlobal("trim_upper");
+            _ = try lua.getGlobal(transform);
             try lua.pushAny(input);
             try lua.protectedCall(.{ .args = 1, .results = 1 });
 
@@ -147,8 +147,7 @@ pub fn main() !u8 {
             try stdout.writeAll(result);
             try stdout.flush();
 
-            // TODO: save before transform, after transform, replace with transform
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(result), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
 
             return 0;
@@ -158,7 +157,7 @@ pub fn main() !u8 {
             const file = cwd.openFile(arg, .{}) catch |err| std.process.fatal("unable to open file: {t}\n", .{err});
             defer file.close();
 
-            catted_anything = true;
+            copied_anything = true;
             var file_reader = file.reader(&.{});
             const input = try file_reader.interface.allocRemaining(gpa, .unlimited);
             defer gpa.free(input);
@@ -171,19 +170,12 @@ pub fn main() !u8 {
             var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
         }
+
+        args_num += 1;
     }
-    if (!catted_anything) {
-        const stdin = &stdin_reader.interface;
-        const input = try stdin.allocRemaining(gpa, .unlimited);
-        defer gpa.free(input);
 
-        try clipboard_lib.write(input);
-
-        try stdout.writeAll(input);
-        try stdout.flush();
-
-        var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-        try storage.write(&current_clipboard);
+    if (!copied_anything) {
+        try processStdIn(gpa, &storage, stdin, stdout);
         return 0;
     }
     return 1;
@@ -192,6 +184,19 @@ pub fn main() !u8 {
 fn usage(exe: []const u8) !u8 {
     std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
+}
+
+fn processStdIn(gpa: std.mem.Allocator, storage: *nclip_lib.Storage, stdin: *std.Io.Reader, stdout: *std.Io.Writer) !void {
+    const input = try stdin.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+
+    try clipboard_lib.write(input);
+
+    try stdout.writeAll(input);
+    try stdout.flush();
+
+    var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+    try storage.write(&current_clipboard);
 }
 
 test {
