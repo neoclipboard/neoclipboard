@@ -21,6 +21,33 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
+    // Installed dependencies
+    // https://github.com/dgv/clipboard
+    // TODO: switch to objc binding https://nathancraddock.com/blog/writing-to-the-clipboard-the-hard-way/#a-bonus-zig-implementation
+    // TODO: write Io.Reader and Io.Writer for clipboard
+    const clipboard_dep = b.dependency("clipboard", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // https://github.com/natecraddock/ziglua
+    const lua_dep = b.dependency("zlua", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // https://github.com/nDimensional/zig-sqlite
+    const sqlite_dep = b.dependency("sqlite", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // https://github.com/ziglibs/known-folders
+    const known_folders_dep = b.dependency("known_folders", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // This creates a module, which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
     // Zig modules are the preferred way of making Zig code available to consumers.
@@ -40,6 +67,9 @@ pub fn build(b: *std.Build) void {
         // which requires us to specify a target.
         .target = target,
     });
+
+    // add imports to mod
+    mod.addImport("sqlite", sqlite_dep.module("sqlite"));
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -83,23 +113,12 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // https://github.com/dgv/clipboard
-    // TODO: switch to objc binding https://nathancraddock.com/blog/writing-to-the-clipboard-the-hard-way/#a-bonus-zig-implementation
-    // TODO: write Io.Reader and Io.Writer for clipboard
-    exe.root_module.addImport("clipboard", b.dependency("clipboard", .{}).module("clipboard"));
-
-    // https://github.com/natecraddock/ziglua
-    const lua_dep = b.dependency("zlua", .{
-        .target = target,
-        .optimize = optimize,
-    });
+    // add imports to exe
+    exe.root_module.addImport("clipboard", clipboard_dep.module("clipboard"));
     exe.root_module.addImport("zlua", lua_dep.module("zlua"));
+    exe.root_module.addImport("sqlite", sqlite_dep.module("sqlite"));
+    exe.root_module.addImport("known_folders", known_folders_dep.module("known-folders"));
 
-    // https://github.com/nDimensional/zig-sqlite
-    exe.root_module.addImport("sqlite", b.dependency("sqlite", .{}).module("sqlite"));
-
-    // https://github.com/ziglibs/known-folders
-    exe.root_module.addImport("known-folders", b.dependency("known_folders", .{}).module("known-folders"));
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
