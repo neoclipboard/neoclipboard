@@ -72,11 +72,13 @@ bind-key Y run-shell "tmux save-buffer - | ncopy -"
 ```console
 ncopy:
     -: accept stdin
+    -t {transform}: transform before copy. {transform} is a function name from your `init.lua`.
     file_name: copy file
 npaste:
     -o: Output clipboard (bypass storage)
     -h: Output last clipboard from storage
     -l: List clipboards from storage (NUL terminated for fzf usage)
+    -t {transform}: transform on paste. {transform} is a function name from your `init.lua`.
 ```
 
 List from storage with fzf

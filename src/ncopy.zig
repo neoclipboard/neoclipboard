@@ -1,6 +1,5 @@
 // TODO:
 // - Edit clipboard via $EDITOR
-// - Tranform on copy
 
 const std = @import("std");
 const builtin = @import("builtin");

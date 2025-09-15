@@ -1,6 +1,5 @@
 // TODO:
 // - Paste clipboard to file
-// - Transform on paste
 
 const std = @import("std");
 const builtin = @import("builtin");
