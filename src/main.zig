@@ -199,6 +199,7 @@ pub fn main() !u8 {
             try stdout.flush();
             return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
+            // TODO: fix imports for lua files
             // TODO: handle transform names
             const stdin = &stdin_reader.interface;
             const input = try stdin.allocRemaining(gpa, .unlimited);

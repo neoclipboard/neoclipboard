@@ -40,7 +40,7 @@ $ ./zig-out/bin/nclip
 
 ## TODO
 
-- handle null bytes in strings?
+...
 
 ## Configure with vim and tmux
 
@@ -95,7 +95,7 @@ echo "
 Update `~/.config/nclip/lua/init.lua`:
 
 ```lua
-package.path = package.path .. ";./lua/?.lua"
+package.path = package.path .. ";~/.config/nclip/lua/?.lua"
 
 function upper(input)
    return string.upper(input)
