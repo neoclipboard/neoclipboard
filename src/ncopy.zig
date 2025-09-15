@@ -44,9 +44,9 @@ pub fn main() !u8 {
         defer std.testing.expect(debug_allocator.deinit() == .ok) catch @panic("leak");
     };
 
-    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
-    defer arena_allocator.deinit();
-    const arena = arena_allocator.allocator();
+    // var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    // defer arena_allocator.deinit();
+    // const arena = arena_allocator.allocator();
 
     const args = std.process.argsAlloc(gpa) catch {
         std.debug.print("Failed to allocate args\n", .{});
@@ -116,25 +116,6 @@ pub fn main() !u8 {
 
             var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
-            return 0;
-        } else if (std.mem.eql(u8, arg, "-o")) {
-            // copy xclip's option name for now
-            try stdout.writeAll(clipboard_lib.read() catch @panic("can't read clipboard"));
-            try stdout.flush();
-            return 0;
-        } else if (std.mem.eql(u8, arg, "-h")) {
-            const clipboard = try storage.last(arena);
-            try stdout.writeAll(clipboard.body);
-            try stdout.flush();
-            return 0;
-        } else if (std.mem.eql(u8, arg, "-l")) {
-            const clipboards = try storage.list(arena);
-
-            for (clipboards.items) |clipboard| {
-                // print ending with NUL ascii to handle multi-line clipboards
-                try stdout.print("{s}\x00", .{ clipboard.body });
-            }
-            try stdout.flush();
             return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
             // TODO: fix imports for lua files

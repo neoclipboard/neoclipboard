@@ -103,21 +103,7 @@ pub fn main() !u8 {
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
 
     for (args[1..]) |arg| {
-        if (std.mem.eql(u8, arg, "-")) {
-            catted_anything = true;
-            const stdin = &stdin_reader.interface;
-            const input = try stdin.allocRemaining(gpa, .unlimited);
-            defer gpa.free(input);
-
-            try clipboard_lib.write(input);
-
-            try stdout.writeAll(input);
-            try stdout.flush();
-
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-            try storage.write(&current_clipboard);
-            return 0;
-        } else if (std.mem.eql(u8, arg, "-o")) {
+        if (std.mem.eql(u8, arg, "-o")) {
             // copy xclip's option name for now
             try stdout.writeAll(clipboard_lib.read() catch @panic("can't read clipboard"));
             try stdout.flush();
@@ -174,6 +160,7 @@ pub fn main() !u8 {
         } else if (std.mem.startsWith(u8, arg, "-")) {
             return usage(exe);
         } else {
+            // TODO write to file
             const file = cwd.openFile(arg, .{}) catch |err| std.process.fatal("unable to open file: {t}\n", .{err});
             defer file.close();
 
@@ -192,17 +179,9 @@ pub fn main() !u8 {
         }
     }
     if (!catted_anything) {
-        const stdin = &stdin_reader.interface;
-        const input = try stdin.allocRemaining(gpa, .unlimited);
-        defer gpa.free(input);
-
-        try clipboard_lib.write(input);
-
-        try stdout.writeAll(input);
+        const clipboard = try storage.last(arena);
+        try stdout.writeAll(clipboard.body);
         try stdout.flush();
-
-        var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
-        try storage.write(&current_clipboard);
         return 0;
     }
     return 1;
@@ -216,15 +195,3 @@ fn usage(exe: []const u8) !u8 {
 test {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-
-// test "fuzz example" {
-//     const Context = struct {
-//         fn testOne(context: @This(), input: []const u8) anyerror!void {
-//             _ = context;
-//             // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-//             try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-//         }
-//     };
-//     try std.testing.fuzz(Context{}, Context.testOne, .{});
-// }

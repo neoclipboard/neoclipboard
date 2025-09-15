@@ -145,11 +145,40 @@ pub fn build(b: *std.Build) void {
     // installation directory rather than directly from within the cache directory.
     ncopy_cmd.step.dependOn(b.getInstallStep());
 
+    const npaste_exe = b.addExecutable(.{
+        .name = "npaste",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/npaste.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "neoclipboard", .module = mod },
+            },
+        }),
+    });
+
+    // add imports to exe
+    npaste_exe.root_module.addImport("clipboard", clipboard_dep.module("clipboard"));
+    npaste_exe.root_module.addImport("zlua", lua_dep.module("zlua"));
+    npaste_exe.root_module.addImport("sqlite", sqlite_dep.module("sqlite"));
+    npaste_exe.root_module.addImport("known_folders", known_folders_dep.module("known-folders"));
+
+    b.installArtifact(npaste_exe);
+
+    const npaste_step = b.step("npaste", "Run npaste app");
+
+    const npaste_cmd = b.addRunArtifact(npaste_exe);
+    npaste_step.dependOn(&npaste_cmd.step);
+
+    npaste_cmd.step.dependOn(b.getInstallStep());
+
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
         if (std.mem.eql(u8, args[0], "ncopy")) {
             ncopy_cmd.addArgs(args[1..]);
+        } else if (std.mem.eql(u8, args[0], "npaste")) {
+            npaste_cmd.addArgs(args[1..]);
         }
     }
 
@@ -173,12 +202,21 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_ncopy_exe_tests = b.addRunArtifact(ncopy_exe_tests);
 
+    const npaste_exe_tests = b.addTest(.{
+        .root_module = npaste_exe.root_module,
+    });
+
+    // A run step that will run the second test executable.
+    const run_npaste_exe_tests = b.addRunArtifact(npaste_exe_tests);
+
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_ncopy_exe_tests.step);
+    test_step.dependOn(&run_npaste_exe_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
