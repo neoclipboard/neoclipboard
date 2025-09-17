@@ -9,6 +9,7 @@ const known_folders = @import("known_folders");
 
 // local
 const copy = @import("copy.zig");
+const paste = @import("paste.zig");
 const nclip_lib = @import("neoclipboard");
 
 const Lua = zlua.Lua;
@@ -102,11 +103,12 @@ pub fn main() !u8 {
     const stdin = &stdin_reader.interface;
 
     const cmd = args[1];
-    const cmd_args = args[2..];
+    const cmd_args = args[1..];
     if (std.mem.eql(u8, cmd, "copy")) {
         _ = try copy.cmd(gpa, &cmd_args, stdout, stdin, &storage);
         return 0;
     } else if (std.mem.eql(u8, cmd, "paste")) {
+        _ = try paste.cmd(gpa, &cmd_args, stdout, &storage);
     } else if (std.mem.startsWith(u8, cmd, "-")) {
         return usage(exe);
     } else {

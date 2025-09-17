@@ -35,33 +35,7 @@ const nclip_lib = @import("neoclipboard");
 const Lua = zlua.Lua;
 
 pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Writer, stdin: *std.Io.Reader, storage: *nclip_lib.Storage) !u8 {
-    // // Prints to stderr, ignoring potential errors.
-    // try nclip_lib.bufferedPrint();
-
-    // var arena_allocator = std.heap.ArenaAllocator.init(gpa);
-    // defer arena_allocator.deinit();
-    // const arena = arena_allocator.allocator();
-
     const cwd = std.fs.cwd();
-
-    // // Get the real path of the current working directory
-    // // https://github.com/ziglang/zig/issues/19353
-    // const cwd_path = try cwd.realpathAlloc(gpa, ".");
-    // defer gpa.free(cwd_path);
-    //
-    // // Join the cwd path with "db.sqlite"
-    // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ cwd_path, "db.sqlite" });
-    // defer gpa.free(db_path);
-    //
-    // std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
-
-    const data_path_dir = try known_folders.open(gpa, known_folders.KnownFolder.data, .{});
-
-    _ = data_path_dir.?.access("nclip", .{}) catch {
-        try data_path_dir.?.makeDir("nclip");
-    };
-    const data_path = try data_path_dir.?.realpathAlloc(gpa, "nclip");
-    defer gpa.free(data_path);
 
     const config_path_dir = try known_folders.open(gpa, known_folders.KnownFolder.local_configuration, .{});
 
@@ -71,17 +45,11 @@ pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Wr
     const config_path = try config_path_dir.?.realpathAlloc(gpa, "nclip");
     defer gpa.free(config_path);
 
-    const db_path = try std.fs.path.joinZ(gpa, &.{ data_path, "db.sqlite" });
-    // const db_path = try std.fs.path.join(gpa, &[_][]const u8{ data_path, "db.sqlite" });
-    defer gpa.free(db_path);
-
     // std.debug.print("Full path to db.sqlite: {s}\n", .{db_path});
-
-    const db = try sqlite.Database.open(.{ .path = db_path });
-    defer db.close();
 
     const args = cmd_args.*;
     const exe = args[0];
+
     var copied_anything = false;
 
     var args_num: usize = 1;
