@@ -53,15 +53,6 @@ pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Wr
             try stdout.writeAll(clipboard.body);
             try stdout.flush();
             return 0;
-        } else if (std.mem.eql(u8, arg, "-l")) {
-            const clipboards = try storage.list(arena);
-
-            for (clipboards.items) |clipboard| {
-                // print ending with NUL ascii to handle multi-line clipboards
-                try stdout.print("{s}\x00", .{ clipboard.body });
-            }
-            try stdout.flush();
-            return 0;
         } else if (std.mem.eql(u8, arg, "-t")) {
             // TODO: fix imports for lua files
             args_num += 1;

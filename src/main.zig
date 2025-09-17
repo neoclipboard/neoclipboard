@@ -46,9 +46,9 @@ pub fn main() !u8 {
         defer std.testing.expect(debug_allocator.deinit() == .ok) catch @panic("leak");
     };
 
-    // var arena_allocator = std.heap.ArenaAllocator.init(gpa);
-    // defer arena_allocator.deinit();
-    // const arena = arena_allocator.allocator();
+    var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+    defer arena_allocator.deinit();
+    const arena = arena_allocator.allocator();
 
     const args = std.process.argsAlloc(gpa) catch {
         std.debug.print("Failed to allocate args\n", .{});
@@ -102,6 +102,10 @@ pub fn main() !u8 {
     var stdin_reader = std.fs.File.stdin().readerStreaming(&.{});
     const stdin = &stdin_reader.interface;
 
+    if (args.len == 1) {
+        return usage(exe);
+    }
+
     const cmd = args[1];
     const cmd_args = args[1..];
     if (std.mem.eql(u8, cmd, "copy")) {
@@ -109,6 +113,15 @@ pub fn main() !u8 {
         return 0;
     } else if (std.mem.eql(u8, cmd, "paste")) {
         _ = try paste.cmd(gpa, &cmd_args, stdout, &storage);
+    } else if (std.mem.eql(u8, cmd, "list")) {
+        const clipboards = try storage.list(arena);
+
+        for (clipboards.items) |clipboard| {
+            // print ending with NUL ascii to handle multi-line clipboards
+            try stdout.print("{s}\x00", .{ clipboard.body });
+        }
+        try stdout.flush();
+        return 0;
     } else if (std.mem.startsWith(u8, cmd, "-")) {
         return usage(exe);
     } else {

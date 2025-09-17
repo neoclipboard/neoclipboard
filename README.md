@@ -78,14 +78,14 @@ nclip copy:
 nclip paste:
     -o: Output clipboard (bypass storage)
     -h: Output last clipboard from storage
-    -l: List clipboards from storage (NUL terminated for fzf usage)
     -t {transform}: transform on paste. {transform} is a function name from your `init.lua`.
+nclip list: List clipboards from storage (NUL terminated for fzf usage)
 ```
 
 List from storage with fzf
 
 ```console
-$ nclip paste -l | fzf --read0
+$ nclip list | fzf --read0
 ```
 
 ### Lua tranforms
