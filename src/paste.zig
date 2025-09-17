@@ -132,7 +132,3 @@ fn usage(exe: []const u8) !u8 {
     std.log.warn("Usage: {s} [FILE]...\n", .{exe});
     return error.Invalid;
 }
-
-test {
-    std.testing.refAllDeclsRecursive(@This());
-}
