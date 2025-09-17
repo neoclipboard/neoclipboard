@@ -87,13 +87,13 @@ pub fn build(b: *std.Build) void {
     //
     // If neither case applies to you, feel free to delete the declaration you
     // don't need and to put everything under a single module.
-    const ncopy_exe = b.addExecutable(.{
-        .name = "ncopy",
+    const exe = b.addExecutable(.{
+        .name = "nclip",
         .root_module = b.createModule(.{
             // b.createModule defines a new module just like b.addModule but,
             // unlike b.addModule, it does not expose the module to consumers of
             // this package, which is why in this case we don't have to give it a name.
-            .root_source_file = b.path("src/ncopy.zig"),
+            .root_source_file = b.path("src/main.zig"),
             // Target and optimization levels must be explicitly wired in when
             // defining an executable or library (in the root module), and you
             // can also hardcode a specific target for an executable or library
@@ -114,23 +114,23 @@ pub fn build(b: *std.Build) void {
     });
 
     // add imports to exe
-    ncopy_exe.root_module.addImport("clipboard", clipboard_dep.module("clipboard"));
-    ncopy_exe.root_module.addImport("zlua", lua_dep.module("zlua"));
-    ncopy_exe.root_module.addImport("sqlite", sqlite_dep.module("sqlite"));
-    ncopy_exe.root_module.addImport("known_folders", known_folders_dep.module("known-folders"));
+    exe.root_module.addImport("clipboard", clipboard_dep.module("clipboard"));
+    exe.root_module.addImport("zlua", lua_dep.module("zlua"));
+    exe.root_module.addImport("sqlite", sqlite_dep.module("sqlite"));
+    exe.root_module.addImport("known_folders", known_folders_dep.module("known-folders"));
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
     // by passing `--prefix` or `-p`.
-    b.installArtifact(ncopy_exe);
+    b.installArtifact(exe);
 
     // This creates a top level step. Top level steps have a name and can be
     // invoked by name when running `zig build` (e.g. `zig build run`).
     // This will evaluate the `run` step rather than the default step.
     // For a top level step to actually do something, it must depend on other
     // steps (e.g. a Run step, as we will see in a moment).
-    const ncopy_step = b.step("ncopy", "Run ncopy app");
+    const run_step = b.step("run", "Run the app");
 
     // This creates a RunArtifact step in the build graph. A RunArtifact step
     // invokes an executable compiled by Zig. Steps will only be executed by the
@@ -138,48 +138,17 @@ pub fn build(b: *std.Build) void {
     // or if another step depends on it, so it's up to you to define when and
     // how this Run step will be executed. In our case we want to run it when
     // the user runs `zig build run`, so we create a dependency link.
-    const ncopy_cmd = b.addRunArtifact(ncopy_exe);
-    ncopy_step.dependOn(&ncopy_cmd.step);
+    const run_cmd = b.addRunArtifact(exe);
+    run_step.dependOn(&run_cmd.step);
 
     // By making the run step depend on the default step, it will be run from the
     // installation directory rather than directly from within the cache directory.
-    ncopy_cmd.step.dependOn(b.getInstallStep());
-
-    const npaste_exe = b.addExecutable(.{
-        .name = "npaste",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/npaste.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "neoclipboard", .module = mod },
-            },
-        }),
-    });
-
-    // add imports to exe
-    npaste_exe.root_module.addImport("clipboard", clipboard_dep.module("clipboard"));
-    npaste_exe.root_module.addImport("zlua", lua_dep.module("zlua"));
-    npaste_exe.root_module.addImport("sqlite", sqlite_dep.module("sqlite"));
-    npaste_exe.root_module.addImport("known_folders", known_folders_dep.module("known-folders"));
-
-    b.installArtifact(npaste_exe);
-
-    const npaste_step = b.step("npaste", "Run npaste app");
-
-    const npaste_cmd = b.addRunArtifact(npaste_exe);
-    npaste_step.dependOn(&npaste_cmd.step);
-
-    npaste_cmd.step.dependOn(b.getInstallStep());
+    run_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
-        if (std.mem.eql(u8, args[0], "ncopy")) {
-            ncopy_cmd.addArgs(args[1..]);
-        } else if (std.mem.eql(u8, args[0], "npaste")) {
-            npaste_cmd.addArgs(args[1..]);
-        }
+        run_cmd.addArgs(args);
     }
 
     // Creates an executable that will run `test` blocks from the provided module.
@@ -195,28 +164,19 @@ pub fn build(b: *std.Build) void {
     // Creates an executable that will run `test` blocks from the executable's
     // root module. Note that test executables only test one module at a time,
     // hence why we have to create two separate ones.
-    const ncopy_exe_tests = b.addTest(.{
-        .root_module = ncopy_exe.root_module,
+    const exe_tests = b.addTest(.{
+        .root_module = exe.root_module,
     });
 
     // A run step that will run the second test executable.
-    const run_ncopy_exe_tests = b.addRunArtifact(ncopy_exe_tests);
-
-    const npaste_exe_tests = b.addTest(.{
-        .root_module = npaste_exe.root_module,
-    });
-
-    // A run step that will run the second test executable.
-    const run_npaste_exe_tests = b.addRunArtifact(npaste_exe_tests);
-
+    const run_exe_tests = b.addRunArtifact(exe_tests);
 
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_ncopy_exe_tests.step);
-    test_step.dependOn(&run_npaste_exe_tests.step);
+    test_step.dependOn(&run_exe_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
