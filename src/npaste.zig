@@ -1,5 +1,7 @@
 // TODO:
 // - Paste clipboard to file
+// - Use arena for lua
+// - Use Lua for configuration
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -185,6 +187,9 @@ pub fn main() !u8 {
     if (!pasted_anything) {
         const clipboard = try storage.last(arena);
         try stdout.writeAll(clipboard.body);
+        // May fail with BrokenPipe in File.Writer.drain -> std.posix.writev
+        // TODO: research how to handle this
+        // https://blog.csdn.net/fareast_mzh/article/details/140494890
         try stdout.flush();
         return 0;
     }

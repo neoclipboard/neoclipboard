@@ -1,5 +1,24 @@
 // TODO:
 // - Edit clipboard via $EDITOR
+// - $EDITOR update multiple items (maybe rebase like behavior with commands)
+// - Use arena for lua
+// - Use Lua for configuration
+// - Default transforms
+//    - Add Title Before Text
+//    - Make plain text
+//    - Make upper case
+//    - Make lower case
+//    - Capitalize words
+//    - Make single line
+//    - Remove empty lines
+//    - Strip all whitespaces
+//    - Trim surrounding whitespaces
+//    - Prepend text
+//    - Append text
+//    - Paste Text as Files
+//    - Paste Images as Files
+//    - Separate Multiple Items
+// - Split to copy, paste, list, search, edit, delete, replace
 
 const std = @import("std");
 const builtin = @import("builtin");

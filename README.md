@@ -7,6 +7,7 @@ Hackable clipboard manager
 - Build easily extentdable and hackable clipboard manager
 - Learn [Zig](https://ziglang.org)
 - Do not overthink things, just make things work
+- Focus on improving own existing workflows
 
 ## Features
 
