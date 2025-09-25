@@ -10,7 +10,7 @@ const known_folders = @import("known_folders");
 // local
 const copy = @import("copy.zig");
 const paste = @import("paste.zig");
-const nclip_lib = @import("neoclipboard");
+const libnclip = @import("libnclip");
 
 const Lua = zlua.Lua;
 
@@ -28,7 +28,7 @@ var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 
 pub fn main() !u8 {
     // // Prints to stderr, ignoring potential errors.
-    // try nclip_lib.bufferedPrint();
+    // try libnclip.bufferedPrint();
 
     // copied from zig's src/main.zig
     const gpa, const is_debug = gpa: {
@@ -92,7 +92,7 @@ pub fn main() !u8 {
     const db = try sqlite.Database.open(.{ .path = db_path });
     defer db.close();
 
-    var storage: nclip_lib.Storage = .init(&db);
+    var storage: libnclip.Storage = .init(&db);
     try storage.setup();
 
     const exe = args[0];

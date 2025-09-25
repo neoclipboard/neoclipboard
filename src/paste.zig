@@ -13,11 +13,11 @@ const sqlite = @import("sqlite");
 const known_folders = @import("known_folders");
 
 // local
-const nclip_lib = @import("neoclipboard");
+const libnclip = @import("libnclip");
 
 const Lua = zlua.Lua;
 
-pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Writer, storage: *nclip_lib.Storage) !u8 {
+pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Writer, storage: *libnclip.Storage) !u8 {
     var arena_allocator = std.heap.ArenaAllocator.init(gpa);
     defer arena_allocator.deinit();
     const arena = arena_allocator.allocator();
@@ -101,7 +101,7 @@ pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Wr
             try stdout.writeAll(input);
             try stdout.flush();
 
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = libnclip.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
         }
 

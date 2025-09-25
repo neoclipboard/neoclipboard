@@ -30,11 +30,11 @@ const sqlite = @import("sqlite");
 const known_folders = @import("known_folders");
 
 // local
-const nclip_lib = @import("neoclipboard");
+const libnclip = @import("libnclip");
 
 const Lua = zlua.Lua;
 
-pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Writer, stdin: *std.Io.Reader, storage: *nclip_lib.Storage) !u8 {
+pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Writer, stdin: *std.Io.Reader, storage: *libnclip.Storage) !u8 {
     const cwd = std.fs.cwd();
 
     const config_path_dir = try known_folders.open(gpa, known_folders.KnownFolder.local_configuration, .{});
@@ -92,7 +92,7 @@ pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Wr
             try stdout.writeAll(result);
             try stdout.flush();
 
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(result), .timestamp = std.time.timestamp() };
+            var current_clipboard = libnclip.ClipboardModel{ .body = sqlite.text(result), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
 
             return 0;
@@ -112,7 +112,7 @@ pub fn cmd(gpa: std.mem.Allocator, cmd_args: *const [][:0]u8, stdout: *std.Io.Wr
             try stdout.writeAll(input);
             try stdout.flush();
 
-            var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+            var current_clipboard = libnclip.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
             try storage.write(&current_clipboard);
         }
 
@@ -131,7 +131,7 @@ fn usage(exe: []const u8) !u8 {
     return error.Invalid;
 }
 
-fn processStdIn(gpa: std.mem.Allocator, storage: *nclip_lib.Storage, stdin: *std.Io.Reader, stdout: *std.Io.Writer) !void {
+fn processStdIn(gpa: std.mem.Allocator, storage: *libnclip.Storage, stdin: *std.Io.Reader, stdout: *std.Io.Writer) !void {
     const input = try stdin.allocRemaining(gpa, .unlimited);
     defer gpa.free(input);
 
@@ -140,6 +140,6 @@ fn processStdIn(gpa: std.mem.Allocator, storage: *nclip_lib.Storage, stdin: *std
     try stdout.writeAll(input);
     try stdout.flush();
 
-    var current_clipboard = nclip_lib.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
+    var current_clipboard = libnclip.ClipboardModel{ .body = sqlite.text(input), .timestamp = std.time.timestamp() };
     try storage.write(&current_clipboard);
 }
